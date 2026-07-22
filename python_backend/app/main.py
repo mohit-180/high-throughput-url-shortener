@@ -6,16 +6,17 @@ from fastapi import FastAPI, Depends, HTTPException, Request, BackgroundTasks, s
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+
 
 from app.config import settings
-from app.database import get_db_session, engine, async_session_maker
+from app.database import get_db_session, engine
 from app.redis_client import RedisCacheManager, get_redis_client, redis_manager
 from app.models import Base, URLMapping, AnalyticsEvent
 from app.schemas import URLShortenRequest, URLResponse, SystemStatsResponse
 from app.crud import create_short_url, get_url_by_code, delete_url, increment_click_counter
 from app.tasks import record_analytics_task, run_expired_urls_cleanup_daemon
 from app.utils.client_metadata import get_client_metadata
+from app.api.health import health_router
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -37,6 +38,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+app.include_router(
+    health_router,
+    prefix="/api/v1",
+    tags=["Health"],
 )
 
 # Startup & Shutdown Hooks
@@ -65,33 +72,7 @@ async def shutdown_event():
 
 # ==============================================================================
 # ENDPOINTS
-# ==============================================================================
-
-@app.get("/api/v1/health", status_code=status.HTTP_200_OK)
-async def health_check():
-    """Liveness check returning health state of database and cache."""
-    db_alive = False
-    try:
-        async with async_session_maker() as session:
-            await session.execute(select(1))
-            db_alive = True
-    except Exception as e:
-        logger.error(f"Health check PostgreSQL connection failure: {e}")
-        
-    cache_alive = False
-    if redis_manager.client:
-        try:
-            await redis_manager.client.ping()
-            cache_alive = True
-        except Exception:
-            pass
-
-    return {
-        "status": "healthy" if db_alive and cache_alive else "degraded",
-        "timestamp": time.time(),
-        "database_connected": db_alive,
-        "redis_connected": cache_alive
-    }
+# =============================================================================
 
 
 @app.post("/api/v1/shorten", response_model=URLResponse, status_code=status.HTTP_201_CREATED)
