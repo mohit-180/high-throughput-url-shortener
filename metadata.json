@@ -1,0 +1,6 @@
+{
+  "name": "High Throughput URL Shortener",
+  "description": "A production-grade distributed URL shortener and live analytics dashboard featuring interactive cache-aside Redis architecture, Postgres metrics, and built-in load testing simulation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
