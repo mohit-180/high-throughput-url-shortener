@@ -1,3 +1,4 @@
+import { api } from "./api";
 import React, { useState, useEffect, useMemo } from "react";
 import { 
   motion, AnimatePresence 
@@ -45,107 +46,115 @@ export default function App() {
   }, []);
 
   const fetchData = async () => {
-    try {
-      const [resUrls, resStats, resAnalytics] = await Promise.all([
-        fetch("/api/urls").then(res => res.json()),
-        fetch("/api/stats").then(res => res.json()),
-        fetch("/api/analytics").then(res => res.json())
-      ]);
-      setUrls(resUrls);
-      setStats(resStats);
-      setAnalytics(resAnalytics);
-    } catch (e) {
-      console.error("Telemetry connection lost:", e);
-    }
-  };
+  try {
+    const [urls, stats, analytics] = await Promise.all([
+      api.getUrls(),
+      api.getSystemStats(),
+      api.getAnalytics(),
+    ]);
+
+    setUrls(urls);
+    setStats(stats);
+    setAnalytics(analytics);
+  } catch (err) {
+    console.error("Telemetry connection lost:", err);
+  }
+};
 
   const handleShortenSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError(null);
-    setFormSuccess(null);
-    setFormLoading(true);
+  e.preventDefault();
 
-    try {
-      const res = await fetch("/api/shorten", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url: formUrl,
-          custom_code: formCustomCode || undefined,
-          expiry_hours: formExpiryHours || undefined
-        })
-      });
+  setFormError(null);
+  setFormSuccess(null);
+  setFormLoading(true);
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to create shortened URL");
-      }
+  try {
+    const data = await api.shortenUrl({
+      url: formUrl,
+      custom_code: formCustomCode || undefined,
+      expiry_hours: formExpiryHours
+        ? Number(formExpiryHours)
+        : undefined,
+    });
 
-      setFormSuccess(data.shortUrl);
-      setFormUrl("");
-      setFormCustomCode("");
-      setFormExpiryHours("");
-      fetchData();
-    } catch (err: any) {
-      setFormError(err.message || "Something went wrong");
-    } finally {
-      setFormLoading(false);
-    }
-  };
+    setFormSuccess(data.shortUrl);
+
+    setFormUrl("");
+    setFormCustomCode("");
+    setFormExpiryHours("");
+
+    await fetchData();
+  } catch (err: any) {
+    setFormError(err.message || "Something went wrong");
+  } finally {
+    setFormLoading(false);
+  }
+};
 
   const handleDeleteUrl = async (code: string) => {
-    if (!confirm(`Are you sure you want to delete /r/${code}?`)) return;
-    try {
-      const res = await fetch(`/api/urls/${code}`, {
-        method: "DELETE"
-      });
-      if (res.ok) {
-        fetchData();
-      }
-    } catch (e) {
-      console.error("Deletion failed:", e);
-    }
-  };
+  if (!confirm(`Are you sure you want to delete /r/${code}?`)) return;
+
+  try {
+    await api.deleteUrl(code);
+    await fetchData();
+  } catch (err) {
+    console.error("Deletion failed:", err);
+  }
+};
 
   const handleManualPrune = async () => {
-    try {
-      const res = await fetch("/api/cleanup", { method: "POST" });
-      const data = await res.json();
-      alert(`Garbage collector executed! ${data.deletedCount} expired mappings pruned from database and cache.`);
-      fetchData();
-    } catch (e) {
-      console.error("Manual prune sweep failed:", e);
-    }
-  };
+  try {
+    const res = await fetch("/api/cleanup", {
+      method: "POST",
+    });
+
+    const data = await res.json();
+
+    alert(
+      `Garbage collector executed! ${data.deletedCount} expired mappings pruned from database and cache.`
+    );
+
+    await fetchData();
+  } catch (e) {
+    console.error("Manual prune sweep failed:", e);
+  }
+};
 
   const handleMockRedirect = async (code: string) => {
-    // Perform fetch redirect. This triggers the actual server-side endpoint logic:
-    // checking cache hits, querying postgres if cache miss, write-back cache, incrementing clicks,
-    // and storing asynchronous analytics!
-    try {
-      const res = await fetch(`/r/${code}`, { redirect: "manual" });
-      // We manually fetch, which registers click telemetry in background
-      fetchData();
-      // Inspect redirect response headers or search URL mappings list to derive hit status
-      const updatedList = await fetch("/api/urls").then(r => r.json());
-      const item = updatedList.find((u: any) => u.code === code);
-      const urlTarget = item ? item.originalUrl : "https://www.google.com";
-      const statsRes = await fetch("/api/stats").then(r => r.json());
-      
-      // Calculate hits difference to derive if this specific click registered a cache hit
-      const latestAnalytics = await fetch("/api/analytics").then(r => r.json());
-      const mostRecentLog = latestAnalytics.recentClicks.find((l: any) => l.code === code);
-      
-      return {
-        cacheStatus: mostRecentLog ? mostRecentLog.cacheStatus : "MISS",
-        code,
-        url: urlTarget
-      };
-    } catch (e) {
-      console.error("Visual redirection trace error:", e);
-      return { cacheStatus: "MISS" as const, code, url: "https://www.google.com" };
-    }
-  };
+  try {
+    // Trigger the backend redirect endpoint (this increments clicks and records analytics)
+    await fetch(`http://127.0.0.1:8000/r/${code}`, {
+      redirect: "manual",
+    });
+
+    // Refresh dashboard data
+    await fetchData();
+
+    // Get updated data from the API layer
+    const updatedList = await api.getUrls();
+    const analytics = await api.getAnalytics();
+
+    const item = updatedList.find((u) => u.code === code);
+
+    const mostRecentLog = analytics.recentClicks.find(
+      (l: any) => l.code === code
+    );
+
+    return {
+      cacheStatus: mostRecentLog?.cacheStatus ?? "MISS",
+      code,
+      url: item?.originalUrl ?? "https://www.google.com",
+    };
+  } catch (e) {
+    console.error("Visual redirection trace error:", e);
+
+    return {
+      cacheStatus: "MISS" as const,
+      code,
+      url: "https://www.google.com",
+    };
+  }
+};
 
   const handleRunLoadTest = async (concurrency: number, duration: number) => {
     const res = await fetch("/api/simulate-load", {
@@ -160,7 +169,7 @@ export default function App() {
 
   // Color arrays for Recharts Pie
   const COLORS = ["#141414", "#404040", "#737373", "#a3a3a3", "#d4d4d4", "#b91c1c"];
-
+console.log(urls);
   return (
     <div className="min-h-screen bg-[#E4E3E0] text-[#141414] flex flex-col font-sans border-8 border-[#141414] selection:bg-[#141414] selection:text-white antialiased">
       {/* Premium Top Navigation Bar */}
@@ -408,9 +417,12 @@ export default function App() {
                                     <div className="flex justify-end gap-2">
                                       <button
                                         onClick={async () => {
-                                          await handleMockRedirect(u.code);
-                                          alert(`Visually redirected! Telemetry processed in background.`);
-                                        }}
+    const result = await handleMockRedirect(u.code);
+
+    window.open(result.url, "_blank");
+
+    alert("Visually redirected! Telemetry processed in background.");
+}}
                                         className="text-[10px] bg-[#141414] hover:bg-white hover:text-[#141414] text-white border border-[#141414] px-3 py-1 rounded-none transition-all cursor-pointer font-mono font-bold uppercase"
                                       >
                                         Visit

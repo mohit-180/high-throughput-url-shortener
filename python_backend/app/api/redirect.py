@@ -64,8 +64,10 @@ async def redirect_short_url(
             original_url = cached_data["original_url"]
             cache_status = "HIT"
 
+        except HTTPException:
+          raise
         except Exception:
-            original_url = None
+          original_url = None
 
     # 2. Cache miss → PostgreSQL
     if not original_url:

@@ -36,7 +36,7 @@ services:
 
   fastapi:
     build:
-      context: .
+      context: ./python_backend
       dockerfile: Dockerfile
     container_name: url_shortener_api
     restart: always
@@ -56,8 +56,24 @@ services:
       redis:
         condition: service_healthy
     volumes:
+      - ./python_backend:/app
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: url_shortener_frontend
+    restart: always
+    ports:
+      - "3000+:3000"
+    depends_on:
+      - fastapi
+    volumes:
       - .:/app
+      - /app/node_modules
 
 volumes:
   postgres_data:
   redis_data:
+
+

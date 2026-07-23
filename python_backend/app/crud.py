@@ -83,11 +83,14 @@ async def get_url_by_code(db: AsyncSession, code: str) -> URLMapping | None:
 
 async def increment_click_counter(db: AsyncSession, code: str) -> None:
     """Atomic click increment database update."""
+
     await db.execute(
         update(URLMapping)
         .where(URLMapping.code == code)
         .values(clicks=URLMapping.clicks + 1)
     )
+
+    await db.commit()
 
 async def create_analytics_event(
     db: AsyncSession,
