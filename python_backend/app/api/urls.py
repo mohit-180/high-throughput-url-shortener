@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 import json
+import logging
 
 from app.config import settings
 from app.database import get_db_session
@@ -9,6 +10,7 @@ from app.schemas import URLShortenRequest, URLResponse
 from app.crud import create_short_url, get_url_by_code, delete_url
 
 router = APIRouter(tags=["URLs"])
+logger = logging.getLogger(__name__)
 
 @router.post("/shorten", response_model=URLResponse, status_code=status.HTTP_201_CREATED)
 async def create_short_link(
@@ -33,15 +35,19 @@ async def create_short_link(
             db=db,
             original_url=payload.url,
             custom_code=payload.custom_code,
-            expiry_hours=payload.expiry_hours
+            expiry_hours=payload.expiry_hours,
         )
+
         await db.commit()
         await db.refresh(db_item)
-    except Exception as e:
+
+    except Exception:
+        logger.exception("Failed to create short URL")
         await db.rollback()
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Database error during creation: {e}"
+            detail="Failed to create short URL."
         )
 
     # Pre-warm Cache (Cache-Aside eager-write)
@@ -50,6 +56,7 @@ async def create_short_link(
         "original_url": db_item.original_url,
         "expires_at": db_item.expires_at.isoformat() if db_item.expires_at else None
     }
+
     await redis_manager.set(
         key=f"url:{db_item.code}",
         value=json.dumps(cache_payload),

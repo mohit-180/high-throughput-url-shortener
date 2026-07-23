@@ -1,11 +1,7 @@
-import datetime
 from sqlalchemy import select, func
-import time
 import logging
-import json
 import asyncio
-from fastapi import FastAPI, Depends, HTTPException, Request, BackgroundTasks, status
-from fastapi.responses import RedirectResponse
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,16 +11,10 @@ from app.database import get_db_session, engine
 from app.redis_client import redis_manager
 from app.models import Base, URLMapping
 from app.schemas import  SystemStatsResponse
-from app.crud import  get_url_by_code, delete_url, increment_click_counter
-from app.tasks import record_analytics_task, run_expired_urls_cleanup_daemon
-from app.utils.client_metadata import get_client_metadata
+from app.tasks import  run_expired_urls_cleanup_daemon
 from app.api.urls import router as urls_router
 from app.api.health import health_router
-
-print("=" * 60)
-print("MAIN.PY:", __file__)
-print("select =", select)
-print("=" * 60)
+from app.api.redirect import router as redirect_router
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -60,6 +50,11 @@ app.include_router(
     tags=["URLs"],
 )
 
+app.include_router(
+    redirect_router,
+    tags=["Redirect"],
+)
+
 # Startup & Shutdown Hooks
 @app.on_event("startup")
 async def startup_event():
@@ -82,97 +77,6 @@ async def startup_event():
 async def shutdown_event():
     logger.info("Shutting down API application...")
     await redis_manager.disconnect()
-
-
-# ==============================================================================
-# ENDPOINTS
-# =============================================================================
-
-
-@app.get("/r/{code}", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
-async def redirect_short_url(
-    code: str,
-    request: Request,
-    background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db_session)
-):
-    """
-    Primary High-Speed Redirect Router.
-    Implements Cache-Aside architecture. Reads from Redis, falls back to Postgres.
-    Increments click counts and streams analytics telemetry asynchronously.
-    """
-    start_time = time.time()
-    original_url = None
-    cache_status = "MISS"
-    expires_at_dt = None
-
-    # 1. Look up in Redis cache
-    cached_str = await redis_manager.get(f"url:{code}")
-    if cached_str:
-        try:
-            cached_data = json.loads(cached_str)
-            expires_at_str = cached_data.get("expires_at")
-            
-            # Check custom expiration in cache
-            if expires_at_str:
-                expires_at_dt = datetime.datetime.fromisoformat(expires_at_str)
-                if expires_at_dt < datetime.datetime.utcnow():
-                    # Evict from cache and delete from DB async
-                    background_tasks.add_task(redis_manager.delete, f"url:{code}")
-                    background_tasks.add_task(delete_url, db, code)
-                    raise HTTPException(status_code=410, detail="Short link has expired.")
-            
-            original_url = cached_data["original_url"]
-            cache_status = "HIT"
-        except Exception as e:
-            logger.warning(f"Failed to parse cached payload for '{code}': {e}")
-
-    # 2. Cache Miss: Read from PostgreSQL
-    if not original_url:
-        db_item = await get_url_by_code(db, code)
-        if not db_item:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Short URL code not found."
-            )
-        
-        original_url = db_item.original_url
-        expires_at_dt = db_item.expires_at
-        
-        # Populate Cache for future lookups
-        cache_payload = {
-            "code": db_item.code,
-            "original_url": db_item.original_url,
-            "expires_at": db_item.expires_at.isoformat() if db_item.expires_at else None
-        }
-        background_tasks.add_task(
-            redis_manager.set,
-            f"url:{code}",
-            json.dumps(cache_payload),
-            settings.REDIS_TTL_SECONDS
-        )
-
-    # 3. Calculate latency & compile telemetry
-    latency_ms = int((time.time() - start_time) * 1000)
-    meta = get_client_metadata(request)
-
-    # 4. Asynchronously update click counter in DB and record telemetry
-    background_tasks.add_task(increment_click_counter, db, code)
-    background_tasks.add_task(
-        record_analytics_task,
-        code=code,
-        browser=meta["browser"],
-        os=meta["os"],
-        country=meta["country"],
-        ip_address=meta["ip_address"],
-        referrer=meta["referrer"],
-        device_type=meta["device_type"],
-        cache_status=cache_status,
-        latency_ms=max(1, latency_ms) # Ensure at least 1ms latency for profiling logs
-    )
-
-    # 5. Perform HTTP Redirect
-    return RedirectResponse(url=original_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
         
 @app.get("/api/v1/system/stats", response_model=SystemStatsResponse)
