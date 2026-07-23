@@ -150,67 +150,41 @@ The application records useful metadata for each redirect, including:
 
 # 🖼️ Screenshots
 
-> Replace the following placeholders with screenshots from your application.
-
 ---
 
 ## Dashboard
 
-**Alt Text:** Dashboard displaying shortened URLs, analytics, and system information.
+![Dashboard](Screenshots/Dashboard.png)
 
 ```text
-docs/screenshots/dashboard.png
+
 ```
 
----
 
 ## URL Creation
 
-**Alt Text:** URL shortening interface with generated short link.
+![Dashboard](Screenshots/URL-Create.png)
 
-```text
-docs/screenshots/create-url.png
-```
 
 ---
 
 ## Analytics Dashboard
 
-**Alt Text:** Analytics dashboard showing click statistics and usage insights.
-
-```text
-docs/screenshots/analytics.png
-```
+![Dashboard](Screenshots/Analytics.png)
 
 ---
 
 ## Swagger API Documentation
 
-**Alt Text:** FastAPI interactive Swagger UI displaying available REST endpoints.
+![Dashboard](Screenshots/Swagger-ui.png)
 
-```text
-docs/screenshots/swagger-ui.png
-```
 
 ---
 
 ## Docker Deployment
 
-**Alt Text:** Docker Compose services running successfully.
+![Dashboard](Screenshots/Docker.png)
 
-```text
-docs/screenshots/docker.png
-```
-
----
-
-## GitHub Actions
-
-**Alt Text:** Successful GitHub Actions workflow after automated test execution.
-
-```text
-docs/screenshots/github-actions.png
-```
 
 ---
 
