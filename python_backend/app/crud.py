@@ -131,3 +131,125 @@ async def cleanup_expired_urls(db: AsyncSession) -> int:
     stmt = delete(URLMapping).where(URLMapping.expires_at < now)
     result = await db.execute(stmt)
     return result.rowcount
+
+async def get_total_clicks(db: AsyncSession) -> int:
+    result = await db.execute(
+        select(func.count(AnalyticsEvent.id))
+    )
+    return result.scalar() or 0
+
+async def get_cache_stats(db: AsyncSession):
+    hits = await db.scalar(
+        select(func.count()).where(AnalyticsEvent.cache_status == "HIT")
+    ) or 0
+
+    misses = await db.scalar(
+        select(func.count()).where(AnalyticsEvent.cache_status == "MISS")
+    ) or 0
+
+    return hits, misses
+
+async def get_average_latency(db: AsyncSession) -> float:
+    avg = await db.scalar(
+        select(func.avg(AnalyticsEvent.latency_ms))
+    )
+
+    return round(float(avg or 0), 2)
+
+async def get_recent_clicks(
+    db: AsyncSession,
+    limit: int = 25,
+):
+    result = await db.execute(
+        select(AnalyticsEvent)
+        .order_by(AnalyticsEvent.timestamp.desc())
+        .limit(limit)
+    )
+
+    return result.scalars().all()
+
+async def get_browser_distribution(db: AsyncSession):
+    result = await db.execute(
+        select(
+            AnalyticsEvent.browser,
+            func.count(AnalyticsEvent.id)
+        )
+        .group_by(AnalyticsEvent.browser)
+    )
+
+    return [
+        {
+            "name": browser,
+            "value": count,
+        }
+        for browser, count in result.all()
+    ]
+
+async def get_os_distribution(db: AsyncSession):
+    result = await db.execute(
+        select(
+            AnalyticsEvent.os,
+            func.count(AnalyticsEvent.id)
+        )
+        .group_by(AnalyticsEvent.os)
+    )
+
+    return [
+        {
+            "name": os,
+            "value": count,
+        }
+        for os, count in result.all()
+    ]
+
+async def get_country_distribution(db: AsyncSession):
+    result = await db.execute(
+        select(
+            AnalyticsEvent.country,
+            func.count(AnalyticsEvent.id)
+        )
+        .group_by(AnalyticsEvent.country)
+    )
+
+    return [
+        {
+            "name": country,
+            "value": count,
+        }
+        for country, count in result.all()
+    ]
+
+async def get_device_distribution(db: AsyncSession):
+    result = await db.execute(
+        select(
+            AnalyticsEvent.device_type,
+            func.count(AnalyticsEvent.id)
+        )
+        .group_by(AnalyticsEvent.device_type)
+    )
+
+    return [
+        {
+            "name": device,
+            "value": count,
+        }
+        for device, count in result.all()
+    ]
+
+async def get_click_timeline(db: AsyncSession):
+    result = await db.execute(
+        select(
+            func.date(AnalyticsEvent.timestamp),
+            func.count(AnalyticsEvent.id)
+        )
+        .group_by(func.date(AnalyticsEvent.timestamp))
+        .order_by(func.date(AnalyticsEvent.timestamp))
+    )
+
+    return [
+        {
+            "date": str(date),
+            "clicks": count,
+        }
+        for date, count in result.all()
+    ]

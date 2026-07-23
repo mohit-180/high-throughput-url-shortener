@@ -4,6 +4,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "High Throughput Distributed URL Shortener and Analytics Engine"
     DEBUG: bool = True
     API_V1_STR: str = "/api/v1"
+    BASE_URL: str = "http://127.0.0.1:8000"
     
     # Postgres
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres_secure_pass@localhost:5432/url_shortener"

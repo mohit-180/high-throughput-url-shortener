@@ -8,6 +8,9 @@ from app.database import get_db_session
 from app.redis_client import redis_manager
 from app.schemas import URLShortenRequest, URLResponse
 from app.crud import create_short_url, get_url_by_code, delete_url
+from sqlalchemy import select
+from app.models import URLMapping
+from app.config import settings
 
 router = APIRouter(tags=["URLs"])
 logger = logging.getLogger(__name__)
@@ -110,3 +113,32 @@ async def delete_short_link(
     await db.commit()
     return {"detail": "URL mapping and cache eviction completed successfully."}
 
+@router.get(
+    "/urls",
+    response_model=list[URLResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def list_urls(
+    db: AsyncSession = Depends(get_db_session),
+):
+    """
+    Return all shortened URLs ordered by newest first.
+    """
+
+    result = await db.execute(
+        select(URLMapping).order_by(URLMapping.created_at.desc())
+    )
+
+    urls = result.scalars().all()
+
+    return [
+        URLResponse(
+            code=url.code,
+            original_url=url.original_url,
+            short_url=f"{settings.BASE_URL}/r/{url.code}",
+            created_at=url.created_at,
+            expires_at=url.expires_at,
+            clicks=url.clicks,
+        )
+        for url in urls
+    ]

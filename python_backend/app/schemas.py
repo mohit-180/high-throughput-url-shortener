@@ -72,3 +72,33 @@ class DatabaseStats(BaseModel):
 class SystemStatsResponse(BaseModel):
     database: DatabaseStats
     cache: CacheStats
+
+class AnalyticsSummary(BaseModel):
+    totalClicks: int
+    cacheHits: int
+    cacheMisses: int
+    averageLatency: float
+
+class DistributionItem(BaseModel):
+    name: str
+    value: int
+
+
+class TimelineItem(BaseModel):
+    date: str
+    clicks: int     
+
+
+class AnalyticsDashboardResponse(BaseModel):
+    summary: AnalyticsSummary
+    browserDistribution: list[DistributionItem]
+    osDistribution: list[DistributionItem]
+    countryDistribution: list[DistributionItem]
+    deviceDistribution: list[DistributionItem]
+
+    clickTimeline: list[TimelineItem]
+
+    recentClicks: list[AnalyticsEventResponse]
+
+    class Config:
+        from_attributes = True           

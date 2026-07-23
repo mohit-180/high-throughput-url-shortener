@@ -13,6 +13,7 @@ from app.api.urls import router as urls_router
 from app.api.health import health_router
 from app.api.redirect import router as redirect_router
 from app.api.system import router as system_router
+from app.api.analytics import router as analytics_router
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -57,6 +58,12 @@ app.include_router(
     system_router,
     prefix="/api/v1",
     tags=["System"],
+)
+
+app.include_router(
+    analytics_router,
+    prefix="/api/v1",
+    tags=["Analytics"],
 )
 
 # Startup & Shutdown Hooks
