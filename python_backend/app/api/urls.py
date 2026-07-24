@@ -90,7 +90,7 @@ async def get_url_details(
     return URLResponse(
         code=db_item.code,
         original_url=db_item.original_url,
-        short_url=f"/r/{db_item.code}",
+        short_url=f"{settings.BASE_URL}/r/{db_item.code}",
         created_at=db_item.created_at,
         expires_at=db_item.expires_at,
         clicks=db_item.clicks
