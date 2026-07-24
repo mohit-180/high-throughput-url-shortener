@@ -314,12 +314,12 @@ console.log(urls);
                             <input
                               type="text"
                               readOnly
-                              value={`${window.location.origin}${formSuccess}`}
+                              value={formSuccess}
                               className="w-full bg-white p-1.5 border border-[#141414] rounded-none text-[#141414] font-mono text-[10px]"
                             />
                             <button
                               onClick={() => {
-                                navigator.clipboard.writeText(`${window.location.origin}${formSuccess}`);
+                                navigator.clipboard.writeText(formSuccess);
                                 alert("Copied shortened URL!");
                               }}
                               className="bg-[#141414] hover:bg-white hover:text-[#141414] text-white border border-[#141414] font-bold p-1.5 rounded-none transition-colors uppercase text-[10px] px-3"
