@@ -148,6 +148,15 @@ The application records useful metadata for each redirect, including:
 
 ---
 
+
+## 🌐 Live Demo
+
+🚀 **Application:** https://high-throughput-url-shortener.vercel.app  
+⚡ **Backend API:** https://high-throughput-url-shortener-production-990e.up.railway.app/docs  
+💡 Experience real-time URL shortening, Redis-powered caching, analytics, and production-grade API workflows.
+
+---
+
 # 🖼️ Screenshots
 
 ---
