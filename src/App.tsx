@@ -123,7 +123,7 @@ export default function App() {
   const handleMockRedirect = async (code: string) => {
   try {
     // Trigger the backend redirect endpoint (this increments clicks and records analytics)
-    await fetch(`http://127.0.0.1:8000/r/${code}`, {
+    await fetch(`${import.meta.env.VITE_API_BASE_URL.replace("/api/v1", "")}/r/${code}`, {
       redirect: "manual",
     });
 
