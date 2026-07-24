@@ -65,7 +65,7 @@ services:
     container_name: url_shortener_frontend
     restart: always
     ports:
-      - "3000+:3000"
+      - "3000:3000"
     depends_on:
       - fastapi
     volumes:
